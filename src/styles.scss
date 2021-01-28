@@ -24,6 +24,30 @@
     flex-grow: 1;
   }
 
+  .csv-cell {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .csv-cell-edit {
+    width: 100%;
+    min-height: 100%;
+    border: solid 1px var(--ag-input-focus-border-color, rgba(var(--interactive-accent-rgb), 0.4));
+
+    background: var(--ag-background-color, var(--background-primary));
+    border-radius: 3px;
+    box-shadow: 0 1px 4px 1px var(--background-modifier-box-shadow);
+    padding: 0;
+
+    .markdown-source-view {
+      padding: 0 8px;
+    }
+    .CodeMirror-lines {
+      padding:0;
+    }
+  }
+
   @include ag-theme-alpine((
     // use theme parameters where possible
     // main colours (overridden by alpine-dark)

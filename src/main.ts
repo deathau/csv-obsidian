@@ -1,9 +1,9 @@
 import './styles.scss'
-import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting } from 'obsidian';
+import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView } from 'obsidian';
 import * as Papa from 'papaparse';
 // import Grid from 'tui-grid';
 // import { TuiGridEvent, GridEventProps, CellChange } from 'tui-grid/types/event';
-import { Grid, GridOptions } from 'ag-grid-community';
+import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams } from 'ag-grid-community';
 
 export default class CsvPlugin extends Plugin {
 
@@ -69,7 +69,15 @@ class CsvView extends TextFileView {
 
     this.gridOptions = {
       enableCellTextSelection:true,
-      ensureDomOrder:true
+      ensureDomOrder: true,
+      context: {
+        component: this,
+        leaf: leaf
+      },
+      components: {
+        markdownCellRenderer: MarkdownCellRenderer,
+        markdownCellEditor: MarkdownCellEditor
+      }
     };
     this.gridEl = new Grid(this.extContentEl, this.gridOptions);
   }
@@ -115,7 +123,7 @@ class CsvView extends TextFileView {
   // set the file contents
   setViewData = (data: string, clear: boolean) => {
     if (clear) {
-      
+      this.gridOptions.context.filePath = this.file.path;
     }
     else {
       
@@ -153,9 +161,10 @@ class CsvView extends TextFileView {
         // rowDrag: true,
         dndSource: index == 0,
         editable: true,
-        onCellValueChanged: this.cellValueChanged
+        onCellValueChanged: this.cellValueChanged,
         //cellEditor:
-
+        cellRenderer: 'markdownCellRenderer',
+        cellEditor: 'markdownCellEditor'
       }
     })
 
@@ -196,4 +205,85 @@ class CsvView extends TextFileView {
   getIcon() {
     return "document-csv";
   }
+}
+
+class MarkdownCellRenderer implements ICellRendererComp {
+
+  eGui: HTMLElement;
+
+  // Optional - Params for rendering. The same params that are passed to the cellRenderer function.
+  init(params: ICellRendererParams) {
+    this.eGui = document.createElement('div');
+    this.eGui.classList.add('csv-cell');
+    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
+  }
+
+  // Mandatory - Return the DOM element of the component, this is what the grid puts into the cell
+  getGui () {
+    return this.eGui;
+  }
+
+  // Optional - Gets called once by grid after rendering is finished - if your renderer needs to do any cleanup,
+  // do it here
+  destroy() {
+    
+  };
+
+  // Mandatory - Get the cell to refresh. Return true if the refresh succeeded, otherwise return false.
+  // If you return false, the grid will remove the component from the DOM and create
+  // a new component in its place with the new values.
+  refresh(params: ICellRendererParams) {
+    // set value into cell again
+    this.eGui.innerHTML = "";
+    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
+    // return true to tell the grid we refreshed successfully
+    return true;
+  };
+}
+
+class MarkdownCellEditor implements ICellEditorComp {
+
+  eGui: HTMLElement;
+  view: MarkdownView;
+
+  // gets called once after the editor is created
+  init(params: ICellEditorParams) {
+    this.eGui = document.createElement('div');
+    this.eGui.classList.add('csv-cell-edit');
+    this.view = new MarkdownView(params.context.leaf);
+    this.view.currentMode = this.view.sourceMode;
+    this.view.sourceMode.set(params.value, true);
+    //@ts-ignore
+    this.eGui.appendChild(this.view.sourceMode.editorEl);
+    this.view.sourceMode.cmEditor.refresh();
+  };
+
+  // Gets called once after GUI is attached to DOM.
+  // Useful if you want to focus or highlight a component
+  // (this is not possible when the element is not attached)
+  afterGuiAttached() {
+    this.view.sourceMode.cmEditor.focus();
+    this.view.sourceMode.cmEditor.refresh();
+  }
+
+  // Return the DOM element of your editor, this is what the grid puts into the DOM
+  getGui() {
+    this.view.sourceMode.cmEditor.refresh();
+    return this.eGui;
+  }
+
+  // Should return the final value to the grid, the result of the editing
+  getValue() {
+    return this.view.sourceMode.get();
+  }
+
+  // Gets called once by grid after editing is finished
+  // if your editor needs to do any cleanup, do it here
+  destroy() {
+
+  }
+
+  // Gets called once after initialised.
+  // If you return true, the editor will appear in a popup
+  isPopup() { return false; }
 }
