@@ -1,0 +1,118 @@
+@import "ag-grid-community/src/styles/ag-grid.scss";
+@import "ag-grid-community/src/styles/ag-theme-alpine/sass/ag-theme-alpine-mixin";
+
+.workspace-leaf-content[data-type="csv"] .ag-theme-alpine {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  
+  .csv-controls {
+    margin: 20px 8px 8px 8px;
+    padding: 8px;
+    background-color: var(--background-primary-alt);
+    min-width: 140px;
+    max-width: 240px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    flex-grow: 1;
+    overflow: hidden;
+  }
+
+  .ag-root-wrapper.ag-layout-normal {
+    border-width:0px;
+    border-top-width: 1px;
+    flex-grow: 1;
+  }
+
+  @include ag-theme-alpine((
+    // use theme parameters where possible
+    // main colours (overridden by alpine-dark)
+    alpine-active-color: var(--text-accent),
+
+    background-color: var(--background-primary),
+    foreground-color: var(--text-normal),
+    secondary-border-color: var(--background-modifier-border),
+    header-background-color: var(--background-secondary),
+    odd-row-background-color: var(--background-primary-alt),
+    border-color: var(--background-modifier-border),
+    control-panel-background-color: var(--background-secondary),
+    subheader-background-color: var(--background-secondary),
+
+    checkbox-checked-color: ag-derived(alpine-active-color),
+    checkbox-unchecked-color: var(--background-modifier-form-field),
+    checkbox-background-color: ag-derived(background-color),
+
+    // derived colours (shared by alpine-dark)
+    subheader-toolbar-background-color: var(--background-secondary-alt),
+    selected-row-background-color: rgba(var(--interactive-accent-rgb) ,0.3),
+    row-hover-color: rgba(var(--interactive-accent-rgb), 0.1),
+    chip-background-color: var(--background-secondary),
+    secondary-foreground-color: ag-derived(foreground-color),
+    input-disabled-background-color: var(--background-secondary-alt),
+    disabled-foreground-color: var(--text-faint),
+    input-border-color: ag-derived(border-color),
+    header-cell-moving-background-color: ag-derived(background-color),
+    range-selection-border-color: var(--interactive-accent),
+
+    // BORDERS
+    borders: true,
+    borders-side-button: false,
+    border-radius: 3px,
+    selected-tab-underline-transition-speed: 0.3s,
+
+    header-column-resize-handle: true,
+    header-column-resize-handle-width: 2px,
+    header-column-resize-handle-height: 30%,
+
+    // SIZING
+    grid-size: 6px,
+    icon-size: 16px,
+    row-height: ag-derived(grid-size, $times: 7),
+    // if changed, update environment.ts
+    header-height: ag-derived(grid-size, $times: 8),
+    // if changed, update environment.ts
+    list-item-height: ag-derived(grid-size, $times: 4),
+    // if changed, update environment.ts
+    column-select-indent-size: ag-derived(icon-size),
+    cell-horizontal-padding: ag-derived(grid-size, $times: 3),
+    cell-widget-spacing: ag-derived(grid-size, $times: 2),
+
+    widget-container-vertical-padding: ag-derived(grid-size, $times: 2),
+    widget-container-horizontal-padding: ag-derived(grid-size, $times: 2),
+    widget-horizontal-spacing: ag-derived(grid-size, $times: 2),
+    widget-vertical-spacing: ag-derived(grid-size, $times: 1.5),
+
+    toggle-button-height: 18px,
+    toggle-button-width: 28px,
+
+    input-focus-border-color: rgba(var(--interactive-accent-rgb), 0.4),
+    input-focus-box-shadow: 0 0 2px 0.1rem ag-derived(input-focus-border-color),
+
+    // FONTS
+    font-family: (-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif),
+    font-size: 13px,
+    icon-font-family: $ag-theme-alpine-icon-font-family,
+    icons-data: $ag-theme-alpine-icons-data,
+    icons-font-codes: $ag-theme-alpine-icons-font-codes,
+
+    // MISC
+    selected-tab-underline-color: ag-derived(alpine-active-color),
+    selected-tab-underline-width: 2px,
+    full-width-tabs: true,
+
+    card-shadow: 0 1px 4px 1px var(--background-modifier-box-shadow),
+    popup-shadow: ag-derived(card-shadow),
+
+
+
+    // ERRORS FROM CONSOLE
+    input-disabled-border-color: var(--background-modifier-form-field),
+    modal-overlay-background-color: var(--background-modifier-cover),
+    header-column-resize-handle-color: var(--background-modifier-border),
+    
+    range-selection-background-color: rgba(var(--interactive-accent-rgb), 0.2),
+    range-selection-background-color-2: rgba(var(--interactive-accent-rgb), 0.4),
+    range-selection-background-color-3: rgba(var(--interactive-accent-rgb), 0.6),
+    range-selection-background-color-4: rgba(var(--interactive-accent-rgb), 0.8)
+  ));
+}
