@@ -30,6 +30,22 @@
     overflow: auto;
   }
 
+  .ag-cell.col-delete {
+    padding-left: 8px;
+    padding-right: 8px;
+    button {
+      margin:0;
+    }
+  }
+
+  .ag-row.row-add{
+    padding: 8px;
+    text-align: right;
+    button {
+      margin:0;
+    }
+  }
+
   .csv-cell-edit {
     width: 100%;
     min-height: 100%;

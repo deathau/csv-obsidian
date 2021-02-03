@@ -1,9 +1,8 @@
 import './styles.scss'
-import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView } from 'obsidian';
+import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon } from 'obsidian';
 import * as Papa from 'papaparse';
-// import Grid from 'tui-grid';
-// import { TuiGridEvent, GridEventProps, CellChange } from 'tui-grid/types/event';
-import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams } from 'ag-grid-community';
+import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams, RowNode } from 'ag-grid-community';
+import { runInThisContext } from 'vm';
 
 export default class CsvPlugin extends Plugin {
 
@@ -35,6 +34,13 @@ export default class CsvPlugin extends Plugin {
   </text>
     `);
   }
+}
+
+class ParseResult<T> implements Papa.ParseResult<T>, Papa.UnparseObject {
+  data: T[];
+  errors: Papa.ParseError[];
+  meta: Papa.ParseMeta;
+  fields: any[];
 }
 
 // This is the custom view
@@ -77,7 +83,10 @@ class CsvView extends TextFileView {
       components: {
         markdownCellRenderer: MarkdownCellRenderer,
         markdownCellEditor: MarkdownCellEditor
-      }
+      },
+      isFullWidthCell: (rowNode: RowNode) => rowNode?.data?.isFooter,
+      fullWidthCellRenderer: this.footerCellRenderer,
+      getRowNodeId: (data) => `${this.parseResult?.data?.indexOf(data)}`
     };
     this.gridEl = new Grid(this.extContentEl, this.gridOptions);
   }
@@ -88,18 +97,10 @@ class CsvView extends TextFileView {
     this.setViewData(data, false);
   }
 
-  // gridAfterChange = (gridEvent: any) => {
-  //   console.log("grid changed", gridEvent);
-  //   gridEvent.changes.forEach((change: CellChange) => {
-  //     this.parseResult.data[change.rowKey][change.columnName] = change.value;
-  //   });
-  //   this.requestSave();
-  // }
-
   // get the new file contents
   getViewData = () => {
     console.log("getViewData", this.parseResult.data, this.headers);
-    return Papa.unparse(this.parseResult, {header: this.headers});
+    return Papa.unparse({ fields: this.parseResult.fields, data: this.parseResult.data }, {header: this.headers});
   }
 
   defaultColumns: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -118,7 +119,16 @@ class CsvView extends TextFileView {
     
     str = str.reverse();
     return str.join('');
-}
+  }
+
+  getDefaultHeaderRow = (parseResult:any = this.parseResult) => {
+    const defaultHeaderRow: string[] = [];
+    // loop through the first row to create a header row
+    for (let i = 0; i < parseResult.data[0].length; i++) {
+      defaultHeaderRow.push(this.columnName(i));
+    }
+    return defaultHeaderRow;
+  }
 
   // set the file contents
   setViewData = (data: string, clear: boolean) => {
@@ -130,23 +140,21 @@ class CsvView extends TextFileView {
     }
 
     // parse the incoming data string
-    this.parseResult = Papa.parse(data, {
+    let parseResult: Papa.ParseResult<object> = Papa.parse(data, {
       header: this.headers
     });
 
     // The grid view I'm using requires headers
     // so if the file doesn't contain them we have to make some up.
     if (!this.headers) {
-      const defaultHeaderRow: string[] = [];
-      // loop through the first row to create a header row
-      for (let i = 0; i < this.parseResult.data[0].length; i++) {
-        defaultHeaderRow.push(this.columnName(i));
-      }
       // add the new header row to the data
-      this.parseResult.data.unshift(defaultHeaderRow);
+      const defaultHeaderRow = this.getDefaultHeaderRow(parseResult)
+      parseResult.data.unshift(defaultHeaderRow);
       // re-parse the data with the header, so we get all the header related meta
-      this.parseResult = Papa.parse(Papa.unparse(this.parseResult.data), { header: true });
+      parseResult = Papa.parse(Papa.unparse(parseResult.data), { header: true });
+      parseResult.meta.fields = defaultHeaderRow;
     }
+    this.parseResult = parseResult;
     console.log('setViewData', this.parseResult);
 
     // map the header column to an object the grid can use
@@ -164,13 +172,56 @@ class CsvView extends TextFileView {
         onCellValueChanged: this.cellValueChanged,
         //cellEditor:
         cellRenderer: 'markdownCellRenderer',
-        cellEditor: 'markdownCellEditor'
+        cellEditor: 'markdownCellEditor',
+        cellClass: (params: any) => `col-${params.colDef.field?.trim()?.toLowerCase()?.split(' ')?.join('-')}`
       }
     })
+    columns.push({
+      header: 'Actions',
+      cellRenderer: this.actionsCellRenderer,
+      pinned: 'right',
+      width: 75,
+      cellClass: 'col-delete'
+    });
 
     // set the columns and data on the grid
     this.gridOptions.api.setColumnDefs(columns);
-    this.gridOptions.api.setRowData(this.parseResult.data);
+    this.gridOptions.api.setRowData([...this.parseResult.data, { isFooter: true }]);
+  }
+
+  actionsCellRenderer = (params: ICellRendererParams) => {
+    const button = document.createElement('button');
+    button.classList.add("mod-warning");
+    button.onclick = (e) => {
+      console.log(params);
+      this.gridOptions.api.applyTransaction({ remove: [params.node] });
+      this.parseResult.data.remove(this.parseResult.data[params.node.id]);
+      this.requestSave();
+    }
+    setIcon(button, 'trash');
+    return button.outerHTML;
+  }
+
+  footerCellRenderer = (params: ICellRendererParams) => {
+    params.eGridCell.classList.add('row-add');
+    const button = document.createElement('button');
+    button.classList.add("mod-cta");
+    button.onclick = (e) => {
+      let newObj: any = {};
+      this.parseResult.fields.forEach((field: string) => {
+        newObj[field] = '';
+      });
+      // this.gridOptions.api.addItems([newObj]);
+      this.gridOptions.api.applyTransaction({
+        add: [newObj],
+        addIndex: this.parseResult.data.length
+      });
+      this.parseResult.data.push(newObj);
+      this.requestSave();
+      console.log('after', this.parseResult)
+    }
+    button.innerText = "Add Row"
+    return button;
   }
 
   cellValueChanged = (change: any) => {
