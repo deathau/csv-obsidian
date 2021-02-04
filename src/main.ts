@@ -1,8 +1,9 @@
-import './styles.scss'
 import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon } from 'obsidian';
 import * as Papa from 'papaparse';
 import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams, RowNode } from 'ag-grid-community';
-import { runInThisContext } from 'vm';
+import Handsontable from "handsontable";
+import 'handsontable/dist/handsontable.full.css';
+import './styles.scss'
 
 export default class CsvPlugin extends Plugin {
 
@@ -36,13 +37,6 @@ export default class CsvPlugin extends Plugin {
   }
 }
 
-class ParseResult<T> implements Papa.ParseResult<T>, Papa.UnparseObject {
-  data: T[];
-  errors: Papa.ParseError[];
-  meta: Papa.ParseMeta;
-  fields: any[];
-}
-
 // This is the custom view
 class CsvView extends TextFileView {
 
@@ -51,6 +45,8 @@ class CsvView extends TextFileView {
   gridEl: Grid;
   gridOptions: GridOptions;
   fileOptionsEl: HTMLElement;
+  hot: Handsontable;
+  hotSettings: Handsontable.GridSettings;
 
   // this.contentEl is not exposed, so cheat a bit.
   public get extContentEl(): HTMLElement {
@@ -61,6 +57,7 @@ class CsvView extends TextFileView {
   // constructor
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
+    this.onResize = () => this.hot.render();
     this.fileOptionsEl = document.createElement('div');
     this.fileOptionsEl.classList.add('csv-controls');
     this.extContentEl.appendChild(this.fileOptionsEl);
@@ -70,31 +67,60 @@ class CsvView extends TextFileView {
       .addToggle(toggle => {
         toggle.setValue(false).onChange(this.toggleHeaders)
       })
+    const tableContainer = document.createElement('div');
+    tableContainer.classList.add('csv-table-wrapper');
+    this.extContentEl.appendChild(tableContainer);
 
-    this.extContentEl.classList.add('ag-theme-alpine');
+    const hotContainer = document.createElement('div');
+    tableContainer.appendChild(hotContainer);
 
-    this.gridOptions = {
-      enableCellTextSelection:true,
-      ensureDomOrder: true,
-      context: {
-        component: this,
-        leaf: leaf
-      },
-      components: {
-        markdownCellRenderer: MarkdownCellRenderer,
-        markdownCellEditor: MarkdownCellEditor
-      },
-      isFullWidthCell: (rowNode: RowNode) => rowNode?.data?.isFooter,
-      fullWidthCellRenderer: this.footerCellRenderer,
-      getRowNodeId: (data) => `${this.parseResult?.data?.indexOf(data)}`
-    };
-    this.gridEl = new Grid(this.extContentEl, this.gridOptions);
+
+    Handsontable.renderers.registerRenderer('markdown', this.markdownCellRenderer)
+    // Handsontable.renderers.registerRenderer('markdown', this.markdownCellRenderer)
+    this.hotSettings = {
+      // afterChange: this.hotChange,
+      licenseKey: 'non-commercial-and-evaluation',
+      colHeaders: false,
+      rowHeaders: false,
+      autoColumnSize: true,
+      autoRowSize: true,
+      renderer: 'markdown',
+      // editor: 'markdown',
+      className: 'csv-table',
+      contextMenu: true,
+      currentRowClassName: 'active-row',
+      currentColClassName: 'active-col',
+      columnSorting: true,
+      dropdownMenu: true,
+      filters: true,
+      manualColumnFreeze: true,
+      manualColumnMove: true,
+      manualColumnResize: true,
+      manualRowMove: true,
+      manualRowResize: true,
+      search: true, // TODO: Hijack the search ui from markdown views,
+      // preventOverflow: true,
+      height: '100%',
+      width: '100%',
+      // stretchH: 'last'
+    }
+    this.hot = new Handsontable(hotContainer, this.hotSettings);
+  }
+
+  hotChange = (change: Handsontable.CellChange[], source: Handsontable.ChangeSource) => {
+    console.log('cellValueChanged', change);
   }
 
   toggleHeaders = (value:boolean) => {
-    const data = this.getViewData();
+    // const data = this.getViewData();
     this.headers = value;
-    this.setViewData(data, false);
+    this.refreshData();
+    // this.setViewData(data, false);
+    // let data = this.parseResult.data
+    // this.hotSettings.colHeaders = value;
+    // this.hot.updateSettings(this.hotSettings);
+    // this.hot.loadData(this.parseResult.data);
+    // this.hot.render();
   }
 
   // get the new file contents
@@ -130,63 +156,88 @@ class CsvView extends TextFileView {
     return defaultHeaderRow;
   }
 
+  refreshData = () => {
+    let data = [...this.parseResult.data];
+    if (this.headers) {
+      this.hotSettings.colHeaders = data.shift();
+    }
+    else {
+      this.hotSettings.colHeaders = true;
+    }
+
+    console.log(this.hotSettings, data);
+    this.hot.updateSettings(this.hotSettings);
+    this.hot.loadData(data);
+    this.hot.render();
+  }
+
   // set the file contents
   setViewData = (data: string, clear: boolean) => {
     if (clear) {
-      this.gridOptions.context.filePath = this.file.path;
+      // this.gridOptions.context.filePath = this.file.path;
+      this.hot.rootElement.id = this.file.path;
+      this.hotSettings.persistentState = true;
     }
     else {
       
     }
 
     // parse the incoming data string
-    let parseResult: Papa.ParseResult<object> = Papa.parse(data, {
-      header: this.headers
+    this.parseResult = Papa.parse(data, {
+      header: false //this.headers
     });
 
-    // The grid view I'm using requires headers
-    // so if the file doesn't contain them we have to make some up.
-    if (!this.headers) {
-      // add the new header row to the data
-      const defaultHeaderRow = this.getDefaultHeaderRow(parseResult)
-      parseResult.data.unshift(defaultHeaderRow);
-      // re-parse the data with the header, so we get all the header related meta
-      parseResult = Papa.parse(Papa.unparse(parseResult.data), { header: true });
-      parseResult.meta.fields = defaultHeaderRow;
-    }
-    this.parseResult = parseResult;
-    console.log('setViewData', this.parseResult);
+    this.refreshData();
 
-    // map the header column to an object the grid can use
-    const columns = this.parseResult.meta.fields.map((column: string, index:number) => {
-      return {
-        // header: column,
-        field: column,
-        // editor: 'text',
-        filter: true,
-        sortable: true,
-        resizable: true,
-        // rowDrag: true,
-        dndSource: index == 0,
-        editable: true,
-        onCellValueChanged: this.cellValueChanged,
-        //cellEditor:
-        cellRenderer: 'markdownCellRenderer',
-        cellEditor: 'markdownCellEditor',
-        cellClass: (params: any) => `col-${params.colDef.field?.trim()?.toLowerCase()?.split(' ')?.join('-')}`
-      }
-    })
-    columns.push({
-      header: 'Actions',
-      cellRenderer: this.actionsCellRenderer,
-      pinned: 'right',
-      width: 75,
-      cellClass: 'col-delete'
-    });
+    // // The grid view I'm using requires headers
+    // // so if the file doesn't contain them we have to make some up.
+    // if (!this.headers) {
+    //   // add the new header row to the data
+    //   const defaultHeaderRow = this.getDefaultHeaderRow(parseResult)
+    //   parseResult.data.unshift(defaultHeaderRow);
+    //   // re-parse the data with the header, so we get all the header related meta
+    //   parseResult = Papa.parse(Papa.unparse(parseResult.data), { header: true });
+    //   parseResult.meta.fields = defaultHeaderRow;
+    // }
+    // this.parseResult = parseResult;
+    // console.log('setViewData', this.parseResult);
 
-    // set the columns and data on the grid
-    this.gridOptions.api.setColumnDefs(columns);
-    this.gridOptions.api.setRowData([...this.parseResult.data, { isFooter: true }]);
+    // // map the header column to an object the grid can use
+    // const columns = this.parseResult.meta.fields.map((column: string, index:number) => {
+    //   return {
+    //     // header: column,
+    //     field: column,
+    //     // editor: 'text',
+    //     filter: true,
+    //     sortable: true,
+    //     resizable: true,
+    //     // rowDrag: true,
+    //     dndSource: index == 0,
+    //     editable: true,
+    //     onCellValueChanged: this.cellValueChanged,
+    //     //cellEditor:
+    //     cellRenderer: 'markdownCellRenderer',
+    //     cellEditor: 'markdownCellEditor',
+    //     cellClass: (params: any) => `col-${params.colDef.field?.trim()?.toLowerCase()?.split(' ')?.join('-')}`
+    //   }
+    // })
+    // columns.push({
+    //   header: 'Actions',
+    //   cellRenderer: this.actionsCellRenderer,
+    //   pinned: 'right',
+    //   width: 75,
+    //   cellClass: 'col-delete'
+    // });
+
+    // // set the columns and data on the grid
+    // this.gridOptions.api.setColumnDefs(columns);
+    // this.gridOptions.api.setRowData([...this.parseResult.data, { isFooter: true }]);
+  }
+
+  markdownCellRenderer = (instance: Handsontable, TD: HTMLTableCellElement, row: number, col: number, prop: string | number, value: Handsontable.CellValue, cellProperties: Handsontable.CellProperties): HTMLTableCellElement | void => {
+    TD.innerHTML = '';
+    MarkdownRenderer.renderMarkdown(value, TD, this.file.path || '', this || null);
+    return TD;
   }
 
   actionsCellRenderer = (params: ICellRendererParams) => {
@@ -258,39 +309,39 @@ class CsvView extends TextFileView {
   }
 }
 
-class MarkdownCellRenderer implements ICellRendererComp {
+// class MarkdownCellRenderer implements ICellRendererComp {
 
-  eGui: HTMLElement;
+//   eGui: HTMLElement;
 
-  // Optional - Params for rendering. The same params that are passed to the cellRenderer function.
-  init(params: ICellRendererParams) {
-    this.eGui = document.createElement('div');
-    this.eGui.classList.add('csv-cell');
-    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
-  }
+//   // Optional - Params for rendering. The same params that are passed to the cellRenderer function.
+//   init(params: ICellRendererParams) {
+//     this.eGui = document.createElement('div');
+//     this.eGui.classList.add('csv-cell');
+//     MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
+//   }
 
-  // Mandatory - Return the DOM element of the component, this is what the grid puts into the cell
-  getGui () {
-    return this.eGui;
-  }
+//   // Mandatory - Return the DOM element of the component, this is what the grid puts into the cell
+//   getGui () {
+//     return this.eGui;
+//   }
 
-  // Optional - Gets called once by grid after rendering is finished - if your renderer needs to do any cleanup,
-  // do it here
-  destroy() {
+//   // Optional - Gets called once by grid after rendering is finished - if your renderer needs to do any cleanup,
+//   // do it here
+//   destroy() {
     
-  };
+//   };
 
-  // Mandatory - Get the cell to refresh. Return true if the refresh succeeded, otherwise return false.
-  // If you return false, the grid will remove the component from the DOM and create
-  // a new component in its place with the new values.
-  refresh(params: ICellRendererParams) {
-    // set value into cell again
-    this.eGui.innerHTML = "";
-    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
-    // return true to tell the grid we refreshed successfully
-    return true;
-  };
-}
+//   // Mandatory - Get the cell to refresh. Return true if the refresh succeeded, otherwise return false.
+//   // If you return false, the grid will remove the component from the DOM and create
+//   // a new component in its place with the new values.
+//   refresh(params: ICellRendererParams) {
+//     // set value into cell again
+//     this.eGui.innerHTML = "";
+//     MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
+//     // return true to tell the grid we refreshed successfully
+//     return true;
+//   };
+// }
 
 class MarkdownCellEditor implements ICellEditorComp {
 

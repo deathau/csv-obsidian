@@ -1,8 +1,5 @@
-@import "ag-grid-community/src/styles/ag-grid.scss";
-@import "ag-grid-community/src/styles/ag-theme-alpine/sass/ag-theme-alpine-mixin";
-
-.workspace-leaf-content[data-type="csv"] .ag-theme-alpine {
-  padding: 0;
+.workspace-leaf-content[data-type="csv"] .view-content{
+  padding:0;
   display: flex;
   flex-direction: column;
   
@@ -14,145 +11,101 @@
     max-width: 240px;
     border: 1px solid var(--background-modifier-border);
     border-radius: 6px;
-    flex-grow: 1;
+    flex-grow: 0;
     overflow: hidden;
   }
-
-  .ag-root-wrapper.ag-layout-normal {
-    border-width:0px;
-    border-top-width: 1px;
+  .csv-table-wrapper {
+    position: relative;
     flex-grow: 1;
+    width:100%;
   }
 
-  .csv-cell {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-  }
-
-  .ag-cell.col-delete {
-    padding-left: 8px;
-    padding-right: 8px;
-    button {
-      margin:0;
+  td>p:first-child { margin-top: 0; }
+  td>p:last-child { margin-bottom: 0; }
+  
+  .handsontable.csv-table{
+    tbody tr {
+      background-color: var(--background-primary);
     }
-  }
-
-  .ag-row.row-add{
-    padding: 8px;
-    text-align: right;
-    button {
-      margin:0;
+    tbody tr:nth-child(2n) {
+      background-color: var(--background-primary-alt);
     }
-  }
-
-  .csv-cell-edit {
-    width: 100%;
-    min-height: 100%;
-    border: solid 1px var(--ag-input-focus-border-color, rgba(var(--interactive-accent-rgb), 0.4));
-
-    background: var(--ag-background-color, var(--background-primary));
-    border-radius: 3px;
-    box-shadow: 0 1px 4px 1px var(--background-modifier-box-shadow);
-    padding: 0;
-
-    .markdown-source-view {
-      padding: 0 8px;
+    thead tr,
+    tbody th {
+      background-color: var(--background-secondary);
     }
-    .CodeMirror-lines {
-      padding:0;
+    tbody th.ht__highlight,
+    thead th.ht__highlight {
+      background-color: var(--background-secondary-alt);
     }
-  }
+    tbody th.ht__active_highlight,
+    thead th.ht__active_highlight {
+      background-color: var(--interactive-accent);
+      color:var(--text-on-accent)
+    }
 
-  @include ag-theme-alpine((
-    // use theme parameters where possible
-    // main colours (overridden by alpine-dark)
-    alpine-active-color: var(--text-accent),
+    span.colHeader.columnSorting.descending::before {
+      background-image: none;
+      font-size: 0.75em;
+      content: "↓";
+    }
+    span.colHeader.columnSorting.ascending::before {
+      background-image: none;
+      font-size: 0.75em;
+      content: "↑";
+    }
 
-    background-color: var(--background-primary),
-    foreground-color: var(--text-normal),
-    secondary-border-color: var(--background-modifier-border),
-    header-background-color: var(--background-secondary),
-    odd-row-background-color: var(--background-primary-alt),
-    border-color: var(--background-modifier-border),
-    control-panel-background-color: var(--background-secondary),
-    subheader-background-color: var(--background-secondary),
-
-    checkbox-checked-color: ag-derived(alpine-active-color),
-    checkbox-unchecked-color: var(--background-modifier-form-field),
-    checkbox-background-color: ag-derived(background-color),
-
-    // derived colours (shared by alpine-dark)
-    subheader-toolbar-background-color: var(--background-secondary-alt),
-    selected-row-background-color: rgba(var(--interactive-accent-rgb) ,0.3),
-    row-hover-color: rgba(var(--interactive-accent-rgb), 0.1),
-    chip-background-color: var(--background-secondary),
-    secondary-foreground-color: ag-derived(foreground-color),
-    input-disabled-background-color: var(--background-secondary-alt),
-    disabled-foreground-color: var(--text-faint),
-    input-border-color: ag-derived(border-color),
-    header-cell-moving-background-color: ag-derived(background-color),
-    range-selection-border-color: var(--interactive-accent),
-
-    // BORDERS
-    borders: true,
-    borders-side-button: false,
-    border-radius: 3px,
-    selected-tab-underline-transition-speed: 0.3s,
-
-    header-column-resize-handle: true,
-    header-column-resize-handle-width: 2px,
-    header-column-resize-handle-height: 30%,
-
-    // SIZING
-    grid-size: 6px,
-    icon-size: 16px,
-    row-height: ag-derived(grid-size, $times: 7),
-    // if changed, update environment.ts
-    header-height: ag-derived(grid-size, $times: 8),
-    // if changed, update environment.ts
-    list-item-height: ag-derived(grid-size, $times: 4),
-    // if changed, update environment.ts
-    column-select-indent-size: ag-derived(icon-size),
-    cell-horizontal-padding: ag-derived(grid-size, $times: 3),
-    cell-widget-spacing: ag-derived(grid-size, $times: 2),
-
-    widget-container-vertical-padding: ag-derived(grid-size, $times: 2),
-    widget-container-horizontal-padding: ag-derived(grid-size, $times: 2),
-    widget-horizontal-spacing: ag-derived(grid-size, $times: 2),
-    widget-vertical-spacing: ag-derived(grid-size, $times: 1.5),
-
-    toggle-button-height: 18px,
-    toggle-button-width: 28px,
-
-    input-focus-border-color: rgba(var(--interactive-accent-rgb), 0.4),
-    input-focus-box-shadow: 0 0 2px 0.1rem ag-derived(input-focus-border-color),
-
-    // FONTS
-    font-family: (-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif),
-    font-size: 13px,
-    icon-font-family: $ag-theme-alpine-icon-font-family,
-    icons-data: $ag-theme-alpine-icons-data,
-    icons-font-codes: $ag-theme-alpine-icons-font-codes,
-
-    // MISC
-    selected-tab-underline-color: ag-derived(alpine-active-color),
-    selected-tab-underline-width: 2px,
-    full-width-tabs: true,
-
-    card-shadow: 0 1px 4px 1px var(--background-modifier-box-shadow),
-    popup-shadow: ag-derived(card-shadow),
-
-
-
-    // ERRORS FROM CONSOLE
-    input-disabled-border-color: var(--background-modifier-form-field),
-    modal-overlay-background-color: var(--background-modifier-cover),
-    header-column-resize-handle-color: var(--background-modifier-border),
+    th,
+    td {
+      background-color: transparent;
+      border-color: var(--background-modifier-border);
+      color: var(--text-normal);
+    }
     
-    range-selection-background-color: rgba(var(--interactive-accent-rgb), 0.2),
-    range-selection-background-color-2: rgba(var(--interactive-accent-rgb), 0.4),
-    range-selection-background-color-3: rgba(var(--interactive-accent-rgb), 0.6),
-    range-selection-background-color-4: rgba(var(--interactive-accent-rgb), 0.8)
-  ));
+    &.htRowHeaders thead tr th:nth-child(2),
+    tr:first-child th,
+    tr:first-child td,
+    th:first-child,
+    th:nth-child(2),
+    td:first-of-type {
+      border-color: var(--background-modifier-border);
+    }
+
+    .wtBorder,
+    td.area:before,
+    td.area-1:before,
+    td.area-2:before,
+    td.area-3:before,
+    td.area-4:before,
+    td.area-5:before,
+    td.area-6:before,
+    td.area-7:before {
+      background-color: var(--interactive-accent) !important;
+    }
+  }
+}
+
+.htMenu.handsontable {
+
+  .ht_master table td.htCustomMenuRenderer,
+  tbody tr {
+    background-color: var(--background-primary);
+  }
+
+  th,
+  td,
+  table tbody tr td {
+    background-color: transparent;
+    border-color: var(--background-modifier-border);
+    color: var(--text-normal);
+  }
+  
+  table tbody tr td.htDisabled {
+    color: var(--text-faint);
+  }
+  
+  table tbody tr td.htSeparator,
+  .ht_master table.htCore {
+    border-color: var(--background-modifier-border);
+  }
 }

@@ -26,6 +26,7 @@
   "dependencies": {
     "@types/papaparse": "^5.2.5",
     "ag-grid-community": "^25.0.1",
+    "handsontable": "^8.3.0",
     "papaparse": "^5.3.0"
   }
 }
