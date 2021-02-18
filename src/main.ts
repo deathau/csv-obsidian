@@ -2,7 +2,7 @@ import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer
 import * as Papa from 'papaparse';
 import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams, RowNode } from 'ag-grid-community';
 import Handsontable from "handsontable";
-import 'handsontable/dist/handsontable.full.css';
+import 'handsontable/dist/handsontable.full.min.css';
 import './styles.scss'
 
 export default class CsvPlugin extends Plugin {
@@ -57,7 +57,11 @@ class CsvView extends TextFileView {
   // constructor
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
-    this.onResize = () => this.hot.render();
+    this.onResize = () => {
+      //@ts-ignore
+      this.hot.view.wt.wtOverlays.updateMainScrollableElements();
+      this.hot.render();
+    }
     this.fileOptionsEl = document.createElement('div');
     this.fileOptionsEl.classList.add('csv-controls');
     this.extContentEl.appendChild(this.fileOptionsEl);
