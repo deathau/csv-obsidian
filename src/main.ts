@@ -98,8 +98,8 @@ class CsvView extends TextFileView {
       manualColumnResize: true,
       manualRowMove: true,
       manualRowResize: true,
-      search: true, // TODO: Hijack the search ui from markdown views,
       // preventOverflow: true,
+      search: true, // TODO:290 Hijack the search ui from markdown views,
       height: '100%',
       width: '100%',
       // stretchH: 'last'
