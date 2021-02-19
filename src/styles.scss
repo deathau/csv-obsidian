@@ -15,12 +15,21 @@
 
     .markdown-source-view {
       padding:0;
+      .CodeMirror-scroll {
+        padding:0;
+        margin:0;
+        padding-bottom:8px;
+      }
       .CodeMirror-sizer {
         padding: 0 !important;
         margin: 0 !important;
-        .CodeMirror-lines{
-          padding: 0;
-        }
+        border: none;
+      }
+      .CodeMirror-lines{
+        padding: 0;
+      }
+      .CodeMirror-code{
+        padding:0;
       }
     }
   }
