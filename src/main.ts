@@ -1,8 +1,10 @@
-import './styles.scss'
-import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon } from 'obsidian';
+import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon, ToggleComponent } from 'obsidian';
 import * as Papa from 'papaparse';
-import { Grid, GridOptions, ICellEditorComp, ICellEditorParams, ICellRendererComp, ICellRendererParams, RowNode } from 'ag-grid-community';
-import { runInThisContext } from 'vm';
+import Handsontable from "handsontable";
+import 'handsontable/dist/handsontable.full.min.css';
+import './styles.scss'
+import { inherits } from 'util';
+import { basename } from 'path';
 
 export default class CsvPlugin extends Plugin {
 
@@ -36,21 +38,28 @@ export default class CsvPlugin extends Plugin {
   }
 }
 
-class ParseResult<T> implements Papa.ParseResult<T>, Papa.UnparseObject {
-  data: T[];
-  errors: Papa.ParseError[];
-  meta: Papa.ParseMeta;
-  fields: any[];
+class ExtHandsontable extends Handsontable {
+  extContext: any;
+
+  constructor(element: Element, options: Handsontable.GridSettings, context:any) {
+    super(element, options);
+    this.extContext = context;
+  }
 }
 
 // This is the custom view
 class CsvView extends TextFileView {
 
   parseResult: any;
-  headers: boolean = false;
-  gridEl: Grid;
-  gridOptions: GridOptions;
+  headerToggle: ToggleComponent;
+  headers: string[] = null;
   fileOptionsEl: HTMLElement;
+  hot: Handsontable;
+  hotSettings: Handsontable.GridSettings;
+  hotExport: Handsontable.plugins.ExportFile;
+  hotState: Handsontable.plugins.PersistenState;
+  hotFilters: Handsontable.plugins.Filters;
+  loadingBar: HTMLElement;
 
   // this.contentEl is not exposed, so cheat a bit.
   public get extContentEl(): HTMLElement {
@@ -61,6 +70,16 @@ class CsvView extends TextFileView {
   // constructor
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
+    this.onResize = () => {
+      //@ts-ignore
+      this.hot.view.wt.wtOverlays.updateMainScrollableElements();
+      this.hot.render();
+    }
+    this.loadingBar = document.createElement('div');
+    this.loadingBar.addClass("progress-bar");
+    this.loadingBar.innerHTML = `<div class="progress-bar-message u-center-text">Loading CSV...</div><div class="progress-bar-indicator"><div class="progress-bar-line"></div><div class="progress-bar-subline" style="display: none;"></div><div class="progress-bar-subline mod-increase"></div><div class="progress-bar-subline mod-decrease"></div></div>`
+    this.extContentEl.appendChild(this.loadingBar);
+
     this.fileOptionsEl = document.createElement('div');
     this.fileOptionsEl.classList.add('csv-controls');
     this.extContentEl.appendChild(this.fileOptionsEl);
@@ -68,167 +87,188 @@ class CsvView extends TextFileView {
     new Setting(this.fileOptionsEl)
       .setName('File Includes Headers')
       .addToggle(toggle => {
+        this.headerToggle = toggle;
         toggle.setValue(false).onChange(this.toggleHeaders)
       })
+    const tableContainer = document.createElement('div');
+    tableContainer.classList.add('csv-table-wrapper');
+    this.extContentEl.appendChild(tableContainer);
 
-    this.extContentEl.classList.add('ag-theme-alpine');
+    const hotContainer = document.createElement('div');
+    tableContainer.appendChild(hotContainer);
 
-    this.gridOptions = {
-      enableCellTextSelection:true,
-      ensureDomOrder: true,
-      context: {
-        component: this,
-        leaf: leaf
-      },
-      components: {
-        markdownCellRenderer: MarkdownCellRenderer,
-        markdownCellEditor: MarkdownCellEditor
-      },
-      isFullWidthCell: (rowNode: RowNode) => rowNode?.data?.isFooter,
-      fullWidthCellRenderer: this.footerCellRenderer,
-      getRowNodeId: (data) => `${this.parseResult?.data?.indexOf(data)}`
-    };
-    this.gridEl = new Grid(this.extContentEl, this.gridOptions);
+
+    Handsontable.renderers.registerRenderer('markdown', this.markdownCellRenderer)
+    Handsontable.editors.registerEditor('markdown', MarkdownCellEditor)
+    this.hotSettings = {
+      afterChange: this.hotChange,
+      afterColumnSort: this.hotSort,
+      afterColumnMove: this.hotColumnMove,
+      afterRowMove: this.hotRowMove,
+      afterCreateCol: this.hotCreateCol,
+      afterCreateRow: this.hotCreateRow,
+      afterRemoveCol: this.hotRemoveCol,
+      afterRemoveRow: this.hotRemoveRow,
+      licenseKey: 'non-commercial-and-evaluation',
+      colHeaders: true,
+      rowHeaders: true,
+      autoColumnSize: true,
+      autoRowSize: true,
+      renderer: 'markdown',
+      editor: 'markdown',
+      className: 'csv-table',
+      contextMenu: true,
+      currentRowClassName: 'active-row',
+      currentColClassName: 'active-col',
+      columnSorting: true,
+      dropdownMenu: true,
+      filters: true,
+      manualColumnFreeze: true,
+      manualColumnMove: false,  // moving columns causes too many headaches for now
+      manualColumnResize: true,
+      manualRowMove: false,  // moving rows causes too many headaches for now
+      manualRowResize: true,
+      persistentState: true,
+      // preventOverflow: true,
+      search: true, // TODO:290 Hijack the search ui from markdown views,
+      height: '100%',
+      width: '100%',
+      // stretchH: 'last'
+    }
+    this.hot = new ExtHandsontable(hotContainer, this.hotSettings, {leaf:this.leaf});
+    this.hotExport = this.hot.getPlugin('exportFile');
+    this.hotState = this.hot.getPlugin('persistentState');
+    this.hotFilters = this.hot.getPlugin('filters');
+
   }
 
-  toggleHeaders = (value:boolean) => {
-    const data = this.getViewData();
-    this.headers = value;
-    this.setViewData(data, false);
+  hotChange = (changes: Handsontable.CellChange[], source: Handsontable.ChangeSource) => {
+    if (source === 'loadData') {
+      return; //don't save this change
+    }
+    this.requestSave();
+  }
+
+  hotSort = (currentSortConfig: Handsontable.columnSorting.Config[], destinationSortConfigs: Handsontable.columnSorting.Config[]) => {
+    this.requestSave();
+  };
+
+  hotColumnMove = (movedColumns: number[], finalIndex: number, dropIndex: number | void, movePossible: boolean, orderChanged: boolean) => {
+    this.requestSave();
+  }
+
+  hotRowMove = (movedRows: number[], finalIndex: number, dropIndex: number | void, movePossible: boolean, orderChanged: boolean) => {
+    this.requestSave();
+  }
+
+  hotCreateCol = (index: number, amount: number, source?: Handsontable.ChangeSource) => {
+    this.requestSave();
+  }
+  hotCreateRow = (index: number, amount: number, source?: Handsontable.ChangeSource) => {
+    this.requestSave();
+  };
+
+  hotRemoveCol = (index: number, amount: number, physicalColumns: number[], source?: Handsontable.ChangeSource) => {
+    this.requestSave();
+  };
+  hotRemoveRow = (index: number, amount: number, physicalRows: number[], source?: Handsontable.ChangeSource) => {
+    this.requestSave();
+  };
+
+  toggleHeaders = (value: boolean) => {
+    value = value || false; // just in case it's undefined
+    // turning headers on
+    if (value) {
+      // we haven't specified headers yet
+      if (this.hotSettings.colHeaders === true) {
+        // get the data
+        let data = this.hot.getSourceDataArray();
+        // take the first row off the data to use as headers
+        this.hotSettings.colHeaders = data.shift();
+        // reload the data without this first row
+        this.hot.loadData(data);
+        // update the settings
+        this.hot.updateSettings(this.hotSettings);
+      }
+    }
+    // turning headers off
+    else {
+      // we have headers
+      if (this.hotSettings.colHeaders !== true) {
+        // get the data
+        let data = this.hot.getSourceDataArray();
+        // put the headings back in as a row
+        data.unshift(this.hot.getColHeader());
+        // specify true to just display alphabetical headers
+        this.hotSettings.colHeaders = true;
+        // reload the data with this new first row
+        this.hot.loadData(data);
+        // update the settings
+        this.hot.updateSettings(this.hotSettings);
+      }
+    }
+
+    // set this value to the state
+    this.hotState.saveValue('hasHeadings', value);
   }
 
   // get the new file contents
   getViewData = () => {
-    console.log("getViewData", this.parseResult.data, this.headers);
-    return Papa.unparse({ fields: this.parseResult.fields, data: this.parseResult.data }, {header: this.headers});
-  }
-
-  defaultColumns: string = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  columnName = (n:number) => {
-    if (n == 0) return 'A';
-    let str:string[] = [];
-    let i:number = 0; // To store current index in str which is result
-    
-    while (n >= 0) {
-      // Find remainder
-      let rem = n % 26;
-      
-      str[i++] = this.defaultColumns[rem];
-      n = Math.floor(n / 26) - 1;
+    // get the *source* data (i.e. unfiltered)
+    let data = this.hot.getSourceDataArray();
+    if (this.hotSettings.colHeaders !== true) {
+      data.unshift(this.hot.getColHeader());
     }
-    
-    str = str.reverse();
-    return str.join('');
-  }
 
-  getDefaultHeaderRow = (parseResult:any = this.parseResult) => {
-    const defaultHeaderRow: string[] = [];
-    // loop through the first row to create a header row
-    for (let i = 0; i < parseResult.data[0].length; i++) {
-      defaultHeaderRow.push(this.columnName(i));
-    }
-    return defaultHeaderRow;
+    let csvString = Papa.unparse(data);
+
+    return csvString;
+    // return Papa.unparse({fields: this.parseResult.fields, data: this.parseResult.data}, {header: false});
+    // return Papa.unparse(this.parseResult);
   }
 
   // set the file contents
   setViewData = (data: string, clear: boolean) => {
-    if (clear) {
-      this.gridOptions.context.filePath = this.file.path;
-    }
-    else {
-      
-    }
-
-    // parse the incoming data string
-    let parseResult: Papa.ParseResult<object> = Papa.parse(data, {
-      header: this.headers
-    });
-
-    // The grid view I'm using requires headers
-    // so if the file doesn't contain them we have to make some up.
-    if (!this.headers) {
-      // add the new header row to the data
-      const defaultHeaderRow = this.getDefaultHeaderRow(parseResult)
-      parseResult.data.unshift(defaultHeaderRow);
-      // re-parse the data with the header, so we get all the header related meta
-      parseResult = Papa.parse(Papa.unparse(parseResult.data), { header: true });
-      parseResult.meta.fields = defaultHeaderRow;
-    }
-    this.parseResult = parseResult;
-    console.log('setViewData', this.parseResult);
-
-    // map the header column to an object the grid can use
-    const columns = this.parseResult.meta.fields.map((column: string, index:number) => {
-      return {
-        // header: column,
-        field: column,
-        // editor: 'text',
-        filter: true,
-        sortable: true,
-        resizable: true,
-        // rowDrag: true,
-        dndSource: index == 0,
-        editable: true,
-        onCellValueChanged: this.cellValueChanged,
-        //cellEditor:
-        cellRenderer: 'markdownCellRenderer',
-        cellEditor: 'markdownCellEditor',
-        cellClass: (params: any) => `col-${params.colDef.field?.trim()?.toLowerCase()?.split(' ')?.join('-')}`
-      }
-    })
-    columns.push({
-      header: 'Actions',
-      cellRenderer: this.actionsCellRenderer,
-      pinned: 'right',
-      width: 75,
-      cellClass: 'col-delete'
-    });
-
-    // set the columns and data on the grid
-    this.gridOptions.api.setColumnDefs(columns);
-    this.gridOptions.api.setRowData([...this.parseResult.data, { isFooter: true }]);
+    this.loadingBar.show();
+    setTimeout(() => this.loadDataAsync(data).then(() => this.loadingBar.hide()), 50);
   }
 
-  actionsCellRenderer = (params: ICellRendererParams) => {
-    const button = document.createElement('button');
-    button.classList.add("mod-warning");
-    button.onclick = (e) => {
-      console.log(params);
-      this.gridOptions.api.applyTransaction({ remove: [params.node] });
-      this.parseResult.data.remove(this.parseResult.data[params.node.id]);
-      this.requestSave();
-    }
-    setIcon(button, 'trash');
-    return button.outerHTML;
-  }
+  loadDataAsync = async (data: string) => {
+    return new Promise<void>((resolve, reject) => {
+      // for the sake of persistent settings we need to set the root element id
+      this.hot.rootElement.id = this.file.path;
+      this.hotSettings.colHeaders = true;
 
-  footerCellRenderer = (params: ICellRendererParams) => {
-    params.eGridCell.classList.add('row-add');
-    const button = document.createElement('button');
-    button.classList.add("mod-cta");
-    button.onclick = (e) => {
-      let newObj: any = {};
-      this.parseResult.fields.forEach((field: string) => {
-        newObj[field] = '';
+      // strip Byte Order Mark if necessary (damn you, Excel)
+      if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
+
+      // parse the incoming data string
+      Papa.parse(data, {
+        header: false,
+        complete: results => {
+          this.parseResult = results;
+          // load the data into the table
+          this.hot.loadData(this.parseResult.data);
+          // we also need to update the settings so that the persistence will work
+          this.hot.updateSettings(this.hotSettings);
+
+          // load the persistent setting for headings
+          let hasHeadings = { value: false };
+          this.hotState.loadValue('hasHeadings', hasHeadings);
+          this.headerToggle.setValue(hasHeadings.value);
+
+          // toggle the headers on or off based on the loaded value
+          this.toggleHeaders(hasHeadings.value)
+          resolve();
+        }
       });
-      // this.gridOptions.api.addItems([newObj]);
-      this.gridOptions.api.applyTransaction({
-        add: [newObj],
-        addIndex: this.parseResult.data.length
-      });
-      this.parseResult.data.push(newObj);
-      this.requestSave();
-      console.log('after', this.parseResult)
-    }
-    button.innerText = "Add Row"
-    return button;
+    });
   }
 
-  cellValueChanged = (change: any) => {
-    console.log('cellValueChanged', change);
-    //! row index is wrong when sorted!!
-    this.parseResult.data[change.node.id][change.column.colId] = change.newValue;
-    this.requestSave();
+  markdownCellRenderer = (instance: Handsontable, TD: HTMLTableCellElement, row: number, col: number, prop: string | number, value: Handsontable.CellValue, cellProperties: Handsontable.CellProperties): HTMLTableCellElement | void => {
+    TD.innerHTML = '';
+    MarkdownRenderer.renderMarkdown(value, TD, this.file.path || '', this || null);
+    return TD;
   }
 
   // clear the view content
@@ -258,83 +298,164 @@ class CsvView extends TextFileView {
   }
 }
 
-class MarkdownCellRenderer implements ICellRendererComp {
-
-  eGui: HTMLElement;
-
-  // Optional - Params for rendering. The same params that are passed to the cellRenderer function.
-  init(params: ICellRendererParams) {
-    this.eGui = document.createElement('div');
-    this.eGui.classList.add('csv-cell');
-    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
-  }
-
-  // Mandatory - Return the DOM element of the component, this is what the grid puts into the cell
-  getGui () {
-    return this.eGui;
-  }
-
-  // Optional - Gets called once by grid after rendering is finished - if your renderer needs to do any cleanup,
-  // do it here
-  destroy() {
-    
-  };
-
-  // Mandatory - Get the cell to refresh. Return true if the refresh succeeded, otherwise return false.
-  // If you return false, the grid will remove the component from the DOM and create
-  // a new component in its place with the new values.
-  refresh(params: ICellRendererParams) {
-    // set value into cell again
-    this.eGui.innerHTML = "";
-    MarkdownRenderer.renderMarkdown(params.value, this.eGui, params.context.filePath || '', params.context.component || null)
-    // return true to tell the grid we refreshed successfully
-    return true;
-  };
-}
-
-class MarkdownCellEditor implements ICellEditorComp {
-
+class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
   eGui: HTMLElement;
   view: MarkdownView;
 
-  // gets called once after the editor is created
-  init(params: ICellEditorParams) {
-    this.eGui = document.createElement('div');
-    this.eGui.classList.add('csv-cell-edit');
-    this.view = new MarkdownView(params.context.leaf);
-    this.view.currentMode = this.view.sourceMode;
-    this.view.sourceMode.set(params.value, true);
-    //@ts-ignore
-    this.eGui.appendChild(this.view.sourceMode.editorEl);
-    this.view.sourceMode.cmEditor.refresh();
-  };
+  init(): void {
+    const extContext: any = (this.hot as ExtHandsontable).extContext;
+    if (extContext && extContext.leaf && !this.eGui) {
+      // create the container
+      this.eGui = this.hot.rootDocument.createElement('DIV');
+      Handsontable.dom.addClass(this.eGui, 'htMarkdownEditor');
+      Handsontable.dom.addClass(this.eGui, 'csv-cell-edit');
+      
+      // create a markdown (editor) view
+      this.view = new MarkdownView(extContext.leaf);
+      this.view.currentMode = this.view.sourceMode;
 
-  // Gets called once after GUI is attached to DOM.
-  // Useful if you want to focus or highlight a component
-  // (this is not possible when the element is not attached)
-  afterGuiAttached() {
+      // @ts-ignore add the editor element to the container
+      this.eGui.appendChild(this.view.sourceMode.editorEl);
+      // hide the container
+      this.eGui.style.display = 'none';
+      // add the container to the table root element
+      this.hot.rootElement.appendChild(this.eGui);
+    }
+  }
+  
+  open(event?: Event): void {
+    this.refreshDimensions();
+    this.eGui.show();
     this.view.sourceMode.cmEditor.focus();
     this.view.sourceMode.cmEditor.refresh();
   }
 
-  // Return the DOM element of your editor, this is what the grid puts into the DOM
-  getGui() {
-    this.view.sourceMode.cmEditor.refresh();
-    return this.eGui;
+  refreshDimensions() {
+    this.TD = this.getEditedCell();
+
+    // TD is outside of the viewport.
+    if (!this.TD) {
+      this.close();
+
+      return;
+    }
+    //@ts-ignore
+    const { wtOverlays } = this.hot.view.wt;
+    const currentOffset = Handsontable.dom.offset(this.TD);
+    const containerOffset = Handsontable.dom.offset(this.hot.rootElement);
+    const scrollableContainer = wtOverlays.scrollableElement;
+    const editorSection = this.checkEditorSection();
+    let width = Handsontable.dom.outerWidth(this.TD) + 1;
+    let height = Handsontable.dom.outerHeight(this.TD) + 1;
+    //@ts-ignore
+    let editTop = currentOffset.top - containerOffset.top - 1 - (scrollableContainer.scrollTop || 0);
+    //@ts-ignore
+    let editLeft = currentOffset.left - containerOffset.left - 1 - (scrollableContainer.scrollLeft || 0);
+    let cssTransformOffset;
+
+    switch (editorSection) {
+      case 'top':
+        cssTransformOffset = Handsontable.dom.getCssTransform(wtOverlays.topOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'left':
+        cssTransformOffset = Handsontable.dom.getCssTransform(wtOverlays.leftOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'top-left-corner':
+        cssTransformOffset = Handsontable.dom.getCssTransform(wtOverlays.topLeftCornerOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'bottom-left-corner':
+        cssTransformOffset = Handsontable.dom.getCssTransform(wtOverlays.bottomLeftCornerOverlay.clone.wtTable.holder.parentNode);
+        break;
+      case 'bottom':
+        cssTransformOffset = Handsontable.dom.getCssTransform(wtOverlays.bottomOverlay.clone.wtTable.holder.parentNode);
+        break;
+      default:
+        break;
+    }
+
+    if (this.hot.getSelectedLast()[0] === 0) {
+      editTop += 1;
+    }
+    if (this.hot.getSelectedLast()[1] === 0) {
+      editLeft += 1;
+    }
+
+    const selectStyle = this.eGui.style;
+
+    if (cssTransformOffset && cssTransformOffset !== -1) {
+      //@ts-ignore
+      selectStyle[cssTransformOffset[0]] = cssTransformOffset[1];
+    } else {
+      Handsontable.dom.resetCssTransform(this.eGui);
+    }
+
+    const cellComputedStyle = Handsontable.dom.getComputedStyle(this.TD, this.hot.rootWindow);
+    //@ts-ignore
+    if (parseInt(cellComputedStyle.borderTopWidth, 10) > 0) {
+      height -= 1;
+    }
+    //@ts-ignore
+    if (parseInt(cellComputedStyle.borderLeftWidth, 10) > 0) {
+      width -= 1;
+    }
+
+    selectStyle.height = `${height}px`;
+    selectStyle.minWidth = `${width}px`;
+    selectStyle.maxWidth = `${width}px`;
+    selectStyle.top = `${editTop}px`;
+    selectStyle.left = `${editLeft}px`;
+    selectStyle.margin = '0px';
   }
 
-  // Should return the final value to the grid, the result of the editing
+  getEditedCell() {
+    //@ts-ignore
+    const { wtOverlays } = this.hot.view.wt;
+    const editorSection = this.checkEditorSection();
+    let editedCell;
+
+    switch (editorSection) {
+      case 'top':
+        editedCell = wtOverlays.topOverlay.clone.wtTable.getCell({
+          row: this.row,
+          col: this.col
+        });
+        this.eGui.style.zIndex = '101';
+        break;
+      case 'top-left-corner':
+      case 'bottom-left-corner':
+        editedCell = wtOverlays.topLeftCornerOverlay.clone.wtTable.getCell({
+          row: this.row,
+          col: this.col
+        });
+        this.eGui.style.zIndex = '103';
+        break;
+      case 'left':
+        editedCell = wtOverlays.leftOverlay.clone.wtTable.getCell({
+          row: this.row,
+          col: this.col
+        });
+        this.eGui.style.zIndex = '102';
+        break;
+      default:
+        editedCell = this.hot.getCell(this.row, this.col);
+        this.eGui.style.zIndex = '';
+        break;
+    }
+
+    return editedCell < 0 ? void 0 : editedCell;
+  }
+
+  close(): void {
+    this.eGui.hide();
+  }
+  focus(): void {
+    this.view.sourceMode.cmEditor.focus();
+    this.view.sourceMode.cmEditor.refresh();
+  }
   getValue() {
     return this.view.sourceMode.get();
   }
-
-  // Gets called once by grid after editing is finished
-  // if your editor needs to do any cleanup, do it here
-  destroy() {
-
+  setValue(newValue?: any): void {
+    this.view.sourceMode.set(newValue, true);
   }
-
-  // Gets called once after initialised.
-  // If you return true, the editor will appear in a popup
-  isPopup() { return false; }
 }
