@@ -1,13 +1,22 @@
-# .ini Editor Obsidian Plugin
-A plugin for [Obsidian](https://obsidian.md) which allows editing of .ini files.
+# CSV Editor Obsidian Plugin
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
+![GitHub All Releases](https://img.shields.io/github/downloads/csv-obsidian/total?style=for-the-badge)
 
-### Compatibility
+A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of CSV files in a spreadsheet-like table format.  
 
-The current API of this repo targets Obsidian **v0.10.11**.  
-It won't work in versions below that due to the apis used only being exposed in 0.10.11
+**Back up your CSV files!** This plugin is very new and therefore experimental. At this stage, data loss is a very real possibility!
 
-### Notes
-This is all very much just a proof of concept for now. Expect bugs and data loss. This is just to prove to myself I *can* handle custom files, before moving on to more interesting files (e.g. CSV) in future.
+![Screenshot](https://github.com/csv-obsidian/raw/main/screenshot.png)
+
+### Features
+- Open (and edit) CSV files right from Obsidian!
+- Auto-saving
+- Per-file setting for including headers (persisted in local storage)
+- Markdown editing an preview for each individual cell (internal links aren't working correctly, yet)
+- Sort the data by clicking on a column name
+- Filter by column values
+- Freeze columns
+- Insert new columns/rows
 
 ## Installation
 
@@ -33,7 +42,7 @@ tweaks, you can do the following:
 - `npm i` or `yarn` to install dependencies
 - `npm run build` to compile.
 - Copy `manifest.json`, `main.js` and `styles.css` to a subfolder of your plugins
-folder (e.g, `<vault>/.obsidian/plugins/cm-show-whitespace-obsidian/`)
+folder (e.g, `<vault>/.obsidian/plugins/<plugin-name>/`)
 - Reload obsidian to see changes
 
 Alternately, you can clone the repo directly into your plugins folder and once
@@ -49,6 +58,4 @@ much, feel free to throw some coins in my hat via
 
 # Version History
 ## 0.0.1
-Initial release!
-- You can open and edit ini files
-- buggy (for some reason the text doesn't appear until you click on it the first time)
+Initial release of csv-obsidian! See [Features](#Features) above
