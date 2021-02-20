@@ -3,15 +3,10 @@ import * as Papa from 'papaparse';
 import Handsontable from "handsontable";
 import 'handsontable/dist/handsontable.full.min.css';
 import './styles.scss'
-import { inherits } from 'util';
-import { basename } from 'path';
 
 export default class CsvPlugin extends Plugin {
 
-  settings: any;
-
   async onload() {
-    this.settings = await this.loadData() || {} as any;
 
     // register a custom icon
     this.addDocumentIcon("csv");
@@ -102,13 +97,13 @@ class CsvView extends TextFileView {
     Handsontable.editors.registerEditor('markdown', MarkdownCellEditor)
     this.hotSettings = {
       afterChange: this.hotChange,
-      afterColumnSort: this.hotSort,
-      afterColumnMove: this.hotColumnMove,
-      afterRowMove: this.hotRowMove,
-      afterCreateCol: this.hotCreateCol,
-      afterCreateRow: this.hotCreateRow,
-      afterRemoveCol: this.hotRemoveCol,
-      afterRemoveRow: this.hotRemoveRow,
+      afterColumnSort: this.requestSave,
+      afterColumnMove: this.requestSave,
+      afterRowMove:   this.requestSave,
+      afterCreateCol: this.requestSave,
+      afterCreateRow: this.requestSave,
+      afterRemoveCol: this.requestSave,
+      afterRemoveRow: this.requestSave,
       licenseKey: 'non-commercial-and-evaluation',
       colHeaders: true,
       rowHeaders: true,
@@ -148,32 +143,6 @@ class CsvView extends TextFileView {
     }
     this.requestSave();
   }
-
-  hotSort = (currentSortConfig: Handsontable.columnSorting.Config[], destinationSortConfigs: Handsontable.columnSorting.Config[]) => {
-    this.requestSave();
-  };
-
-  hotColumnMove = (movedColumns: number[], finalIndex: number, dropIndex: number | void, movePossible: boolean, orderChanged: boolean) => {
-    this.requestSave();
-  }
-
-  hotRowMove = (movedRows: number[], finalIndex: number, dropIndex: number | void, movePossible: boolean, orderChanged: boolean) => {
-    this.requestSave();
-  }
-
-  hotCreateCol = (index: number, amount: number, source?: Handsontable.ChangeSource) => {
-    this.requestSave();
-  }
-  hotCreateRow = (index: number, amount: number, source?: Handsontable.ChangeSource) => {
-    this.requestSave();
-  };
-
-  hotRemoveCol = (index: number, amount: number, physicalColumns: number[], source?: Handsontable.ChangeSource) => {
-    this.requestSave();
-  };
-  hotRemoveRow = (index: number, amount: number, physicalRows: number[], source?: Handsontable.ChangeSource) => {
-    this.requestSave();
-  };
 
   toggleHeaders = (value: boolean) => {
     value = value || false; // just in case it's undefined
@@ -235,33 +204,46 @@ class CsvView extends TextFileView {
 
   loadDataAsync = async (data: string) => {
     return new Promise<void>((resolve, reject) => {
-      // for the sake of persistent settings we need to set the root element id
-      this.hot.rootElement.id = this.file.path;
-      this.hotSettings.colHeaders = true;
+      try {
+        // for the sake of persistent settings we need to set the root element id
+        this.hot.rootElement.id = this.file.path;
+        this.hotSettings.colHeaders = true;
 
-      // strip Byte Order Mark if necessary (damn you, Excel)
-      if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
+        // strip Byte Order Mark if necessary (damn you, Excel)
+        if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
 
-      // parse the incoming data string
-      Papa.parse(data, {
-        header: false,
-        complete: results => {
-          this.parseResult = results;
-          // load the data into the table
-          this.hot.loadData(this.parseResult.data);
-          // we also need to update the settings so that the persistence will work
-          this.hot.updateSettings(this.hotSettings);
+        // parse the incoming data string
+        Papa.parse(data, {
+          header: false,
+          complete: results => {
+            try {
+              this.parseResult = results;
+              // load the data into the table
+              this.hot.loadData(this.parseResult.data);
+              // we also need to update the settings so that the persistence will work
+              this.hot.updateSettings(this.hotSettings);
 
-          // load the persistent setting for headings
-          let hasHeadings = { value: false };
-          this.hotState.loadValue('hasHeadings', hasHeadings);
-          this.headerToggle.setValue(hasHeadings.value);
+              // load the persistent setting for headings
+              let hasHeadings = { value: false };
+              this.hotState.loadValue('hasHeadings', hasHeadings);
+              this.headerToggle.setValue(hasHeadings.value);
 
-          // toggle the headers on or off based on the loaded value
-          this.toggleHeaders(hasHeadings.value)
-          resolve();
-        }
-      });
+              // toggle the headers on or off based on the loaded value
+              this.toggleHeaders(hasHeadings.value)
+              resolve();
+            }
+            catch (err) {
+              reject(err);
+            }
+          },
+          error: (error: Papa.ParseError) => {
+            reject(error);
+          }
+        });
+      }
+      catch (err) {
+        reject(err);
+      }
     });
   }
 
