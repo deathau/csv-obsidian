@@ -204,46 +204,36 @@ class CsvView extends TextFileView {
 
   loadDataAsync = async (data: string) => {
     return new Promise<void>((resolve, reject) => {
-      try {
-        // for the sake of persistent settings we need to set the root element id
-        this.hot.rootElement.id = this.file.path;
-        this.hotSettings.colHeaders = true;
+      // for the sake of persistent settings we need to set the root element id
+      this.hot.rootElement.id = this.file.path;
+      this.hotSettings.colHeaders = true;
 
-        // strip Byte Order Mark if necessary (damn you, Excel)
-        if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
+      // strip Byte Order Mark if necessary (damn you, Excel)
+      if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
 
-        // parse the incoming data string
-        Papa.parse(data, {
-          header: false,
-          complete: results => {
-            try {
-              this.parseResult = results;
-              // load the data into the table
-              this.hot.loadData(this.parseResult.data);
-              // we also need to update the settings so that the persistence will work
-              this.hot.updateSettings(this.hotSettings);
+      // parse the incoming data string
+      Papa.parse(data, {
+        header: false,
+        complete: results => {
+          this.parseResult = results;
+          // load the data into the table
+          this.hot.loadData(this.parseResult.data);
+          // we also need to update the settings so that the persistence will work
+          this.hot.updateSettings(this.hotSettings);
 
-              // load the persistent setting for headings
-              let hasHeadings = { value: false };
-              this.hotState.loadValue('hasHeadings', hasHeadings);
-              this.headerToggle.setValue(hasHeadings.value);
+          // load the persistent setting for headings
+          let hasHeadings = { value: false };
+          this.hotState.loadValue('hasHeadings', hasHeadings);
+          this.headerToggle.setValue(hasHeadings.value);
 
-              // toggle the headers on or off based on the loaded value
-              this.toggleHeaders(hasHeadings.value)
-              resolve();
-            }
-            catch (err) {
-              reject(err);
-            }
-          },
-          error: (error: Papa.ParseError) => {
-            reject(error);
-          }
-        });
-      }
-      catch (err) {
-        reject(err);
-      }
+          // toggle the headers on or off based on the loaded value
+          this.toggleHeaders(hasHeadings.value)
+          resolve();
+        },
+        error: (error: Papa.ParseError) => {
+          reject(error);
+        }
+      });
     });
   }
 
