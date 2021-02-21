@@ -1,12 +1,12 @@
 # CSV Editor Obsidian Plugin
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
-![GitHub All Releases](https://img.shields.io/github/downloads/csv-obsidian/total?style=for-the-badge)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/deathau/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
+![GitHub All Releases](https://img.shields.io/github/downloads/deathau/csv-obsidian/total?style=for-the-badge)
 
 A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of CSV files in a spreadsheet-like table format.  
 
 **Back up your CSV files!** This plugin is very new and therefore experimental. At this stage, data loss is a very real possibility!
 
-![Screenshot](https://github.com/csv-obsidian/raw/main/screenshot.png)
+![Screenshot](https://github.com/deathau/csv-obsidian/raw/main/screenshot.png)
 
 ### Features
 - Open (and edit) CSV files right from Obsidian!
