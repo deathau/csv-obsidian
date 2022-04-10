@@ -56,5 +56,4 @@ You may have to reload obsidian (`ctrl+R`) to see changes.
 Initial release of csv-obsidian! See [Features](#Features) above
 
 ## 0.0.2 (not released yet)
-Second release by [me](https://github.com/Sayama3/) as the plugins was no longer updated. 
-I mostly updated the package and I'll see what I can do
+Update of the source code and the package.json to use to latest version of each.

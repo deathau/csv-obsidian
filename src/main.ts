@@ -286,7 +286,6 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
 
       // create a markdown (editor) view
       this.view = new MarkdownView(extContext.leaf);
-      // this.view.currentMode = this.view.sourceMode;
 
       // @ts-ignore add the editor element to the container
       this.eGui.appendChild(this.view.sourceMode.editorEl);
