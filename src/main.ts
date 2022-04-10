@@ -1,4 +1,13 @@
-import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon, ToggleComponent } from 'obsidian';
+import {
+  addIcon,
+  MarkdownRenderer,
+  MarkdownView,
+  Plugin,
+  Setting,
+  TextFileView,
+  ToggleComponent,
+  WorkspaceLeaf,
+} from 'obsidian';
 import * as Papa from 'papaparse';
 import Handsontable from "handsontable";
 import 'handsontable/dist/handsontable.full.min.css';
@@ -133,7 +142,6 @@ class CsvView extends TextFileView {
     this.hotExport = this.hot.getPlugin('exportFile');
     this.hotState = this.hot.getPlugin('persistentState');
     this.hotFilters = this.hot.getPlugin('filters');
-
   }
 
   hotChange = (changes: Handsontable.CellChange[], source: Handsontable.ChangeSource) => {
@@ -188,9 +196,7 @@ class CsvView extends TextFileView {
       data.unshift(this.hot.getColHeader());
     }
 
-    let csvString = Papa.unparse(data);
-
-    return csvString;
+    return Papa.unparse(data);
     // return Papa.unparse({fields: this.parseResult.fields, data: this.parseResult.data}, {header: false});
     // return Papa.unparse(this.parseResult);
   }
@@ -211,8 +217,7 @@ class CsvView extends TextFileView {
       if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
 
       // parse the incoming data string
-      // My IDE won't recognise the parse string...
-      // @ts-ignore
+      // @ts-ignore My IDE won't recognise the parse string...
       Papa.parse(data, {
         download: undefined,
         header: false,
@@ -287,8 +292,7 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
       // create a markdown (editor) view
       this.view = new MarkdownView(extContext.leaf);
 
-      // @ts-ignore add the editor element to the container
-      this.eGui.appendChild(this.view.sourceMode.editorEl);
+      this.eGui.appendChild(this.view.contentEl);
       // hide the container
       this.eGui.style.display = 'none';
       // add the container to the table root element
@@ -363,11 +367,9 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
     }
 
     const cellComputedStyle = Handsontable.dom.getComputedStyle(this.TD, this.hot.rootWindow);
-    //@ts-ignore
     if (parseInt(cellComputedStyle.borderTopWidth, 10) > 0) {
       height -= 1;
     }
-    //@ts-ignore
     if (parseInt(cellComputedStyle.borderLeftWidth, 10) > 0) {
       width -= 1;
     }
