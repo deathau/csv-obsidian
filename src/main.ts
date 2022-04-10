@@ -1,10 +1,10 @@
 import {
   addIcon,
   MarkdownRenderer,
-  MarkdownView,
+  MarkdownView, Notice,
   Plugin,
   Setting,
-  TextFileView,
+  TextFileView, TFile, TFolder,
   ToggleComponent,
   WorkspaceLeaf,
 } from 'obsidian';
@@ -13,10 +13,61 @@ import Handsontable from "handsontable";
 import 'handsontable/dist/handsontable.full.min.css';
 import './styles.scss'
 
+function CreateEmptyCSV(row: number = 1, col: number = 1): string{
+  let csv: string = "";
+  for (let x = 0; x < col; x++) {
+    for (let y = 0; y < row; y++) {
+      csv += "\"\"";
+      if (y<row-1) csv += ",";
+    }
+    csv += "\n";
+  }
+  return csv;
+}
+
 export default class CsvPlugin extends Plugin {
 
   async onload() {
 
+    //Create menu button to create a CSV
+    this.registerEvent(
+        this.app.workspace.on("file-menu", (menu, file) => {
+          if(file instanceof TFolder){
+            const folder = file as TFolder;
+            menu.addItem((item) => {
+              item
+                  .setTitle("New CSV file")
+                  .setIcon("document")
+                  .onClick(async () => {
+                    //Searching if there is not already csv files named "Untitled".
+                    let index: number = 0;
+                    for (const child of folder.children) {
+                      if (child instanceof TFile){
+                        const file = child as TFile;
+                        if (file.extension === "csv" && file.basename.contains("Untitled")){
+
+                          const split = file.basename.split(" ");
+                          if (split.length > 1 && !isNaN(parseInt(split[1]))){
+                            const i = parseInt(split[1]);
+                            index = i >= index ? i+1:index;
+                          } else {
+                            index = index > 0 ? index : 1;
+                          }
+                        }
+                      }
+                    }
+                    //Creating the file.
+                    const fileName = `Untitled${index>0?` ${index}`:""}`;
+                    await this.app.vault.create(folder.path+`/${fileName}.csv`, CreateEmptyCSV(4,4));
+                    new Notice(`The file \"${fileName}\" has been created in the folder \"${folder.path}\".`)
+
+                    // We're not opening the file as it cause error.
+                    // await this.app.workspace.activeLeaf.openFile(file);
+                  });
+            });
+          }
+        })
+    );
     // register a custom icon
     this.addDocumentIcon("csv");
 
