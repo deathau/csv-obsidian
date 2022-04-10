@@ -52,13 +52,12 @@ class CsvView extends TextFileView {
   hot: Handsontable;
   hotSettings: Handsontable.GridSettings;
   hotExport: Handsontable.plugins.ExportFile;
-  hotState: Handsontable.plugins.PersistenState;
+  hotState: Handsontable.plugins.PersistentState;
   hotFilters: Handsontable.plugins.Filters;
   loadingBar: HTMLElement;
 
   // this.contentEl is not exposed, so cheat a bit.
   public get extContentEl(): HTMLElement {
-    // @ts-ignore
     return this.contentEl;
   }
 
@@ -212,7 +211,10 @@ class CsvView extends TextFileView {
       if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
 
       // parse the incoming data string
+      // My IDE won't recognise the parse string...
+      // @ts-ignore
       Papa.parse(data, {
+        download: undefined,
         header: false,
         complete: results => {
           this.parseResult = results;
@@ -281,10 +283,10 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
       this.eGui = this.hot.rootDocument.createElement('DIV');
       Handsontable.dom.addClass(this.eGui, 'htMarkdownEditor');
       Handsontable.dom.addClass(this.eGui, 'csv-cell-edit');
-      
+
       // create a markdown (editor) view
       this.view = new MarkdownView(extContext.leaf);
-      this.view.currentMode = this.view.sourceMode;
+      // this.view.currentMode = this.view.sourceMode;
 
       // @ts-ignore add the editor element to the container
       this.eGui.appendChild(this.view.sourceMode.editorEl);
@@ -294,12 +296,12 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
       this.hot.rootElement.appendChild(this.eGui);
     }
   }
-  
+
   open(event?: Event): void {
     this.refreshDimensions();
     this.eGui.show();
-    this.view.sourceMode.cmEditor.focus();
-    this.view.sourceMode.cmEditor.refresh();
+    this.view.editor.focus();
+    this.view.editor.refresh();
   }
 
   refreshDimensions() {
@@ -421,13 +423,13 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
     this.eGui.hide();
   }
   focus(): void {
-    this.view.sourceMode.cmEditor.focus();
-    this.view.sourceMode.cmEditor.refresh();
+    this.view.editor.focus();
+    this.view.editor.refresh();
   }
   getValue() {
-    return this.view.sourceMode.get();
+    return this.view.currentMode.get();
   }
   setValue(newValue?: any): void {
-    this.view.sourceMode.set(newValue, true);
+    this.view.currentMode.set(newValue, true);
   }
 }
