@@ -1,12 +1,14 @@
 # CSV Editor Obsidian Plugin
-[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/deathau/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
-![GitHub All Releases](https://img.shields.io/github/downloads/deathau/csv-obsidian/total?style=for-the-badge)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Sayama3/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
+![GitHub All Releases](https://img.shields.io/github/downloads/Sayama3/csv-obsidian/total?style=for-the-badge)
 
 A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of CSV files in a spreadsheet-like table format.  
 
 **Back up your CSV files!** This plugin is very new and therefore experimental. At this stage, data loss is a very real possibility!
 
-![Screenshot](https://github.com/deathau/csv-obsidian/raw/main/screenshot.png)
+![Screenshot](https://github.com/Sayama3/csv-obsidian/raw/main/screenshot.png)
+
+See the original repo [here](https://github.com/deathau/csv-obsidian).
 
 ### Features
 - Open (and edit) CSV files right from Obsidian!
@@ -49,13 +51,10 @@ Alternately, you can clone the repo directly into your plugins folder and once
 dependencies are installed use `npm run dev` to start compilation in watch mode.  
 You may have to reload obsidian (`ctrl+R`) to see changes.
 
-## Pricing
-Huh? This is an open-source plugin I made *for fun*. It's completely free.
-However, if you absolutely *have* to send me money because you like it that
-much, feel free to throw some coins in my hat via
-[PayPal](https://paypal.me/deathau) or sponsor me via
-[GitHub Sponsors](https://github.com/sponsors/deathau)
-
 # Version History
 ## 0.0.1
 Initial release of csv-obsidian! See [Features](#Features) above
+
+## 0.0.2 (not released yet)
+Second release by [me](https://github.com/Sayama3/) as the plugins was no longer updated. 
+I mostly updated the package and I'll see what I can do
