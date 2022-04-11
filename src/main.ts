@@ -1,13 +1,73 @@
-import { Plugin, WorkspaceLeaf, addIcon, TextFileView, Setting, MarkdownRenderer, MarkdownSourceView, MarkdownView, setIcon, ToggleComponent } from 'obsidian';
+import {
+  addIcon,
+  MarkdownRenderer,
+  MarkdownView, Notice,
+  Plugin,
+  Setting,
+  TextFileView, TFile, TFolder,
+  ToggleComponent,
+  WorkspaceLeaf,
+} from 'obsidian';
 import * as Papa from 'papaparse';
 import Handsontable from "handsontable";
 import 'handsontable/dist/handsontable.full.min.css';
 import './styles.scss'
 
+function CreateEmptyCSV(row: number = 1, col: number = 1): string{
+  let csv: string = "";
+  for (let x = 0; x < col; x++) {
+    for (let y = 0; y < row; y++) {
+      csv += "\"\"";
+      if (y<row-1) csv += ",";
+    }
+    csv += "\n";
+  }
+  return csv;
+}
+
 export default class CsvPlugin extends Plugin {
 
   async onload() {
 
+    //Create menu button to create a CSV
+    this.registerEvent(
+        this.app.workspace.on("file-menu", (menu, file) => {
+          if(file instanceof TFolder){
+            const folder = file as TFolder;
+            menu.addItem((item) => {
+              item
+                  .setTitle("New CSV file")
+                  .setIcon("document")
+                  .onClick(async () => {
+                    //Searching if there is not already csv files named "Untitled".
+                    let index: number = 0;
+                    for (const child of folder.children) {
+                      if (child instanceof TFile){
+                        const file = child as TFile;
+                        if (file.extension === "csv" && file.basename.contains("Untitled")){
+
+                          const split = file.basename.split(" ");
+                          if (split.length > 1 && !isNaN(parseInt(split[1]))){
+                            const i = parseInt(split[1]);
+                            index = i >= index ? i+1:index;
+                          } else {
+                            index = index > 0 ? index : 1;
+                          }
+                        }
+                      }
+                    }
+                    //Creating the file.
+                    const fileName = `Untitled${index>0?` ${index}`:""}`;
+                    await this.app.vault.create(folder.path+`/${fileName}.csv`, CreateEmptyCSV(4,4));
+                    new Notice(`The file \"${fileName}\" has been created in the folder \"${folder.path}\".`)
+
+                    // We're not opening the file as it cause error.
+                    // await this.app.workspace.activeLeaf.openFile(file);
+                  });
+            });
+          }
+        })
+    );
     // register a custom icon
     this.addDocumentIcon("csv");
 
@@ -52,13 +112,12 @@ class CsvView extends TextFileView {
   hot: Handsontable;
   hotSettings: Handsontable.GridSettings;
   hotExport: Handsontable.plugins.ExportFile;
-  hotState: Handsontable.plugins.PersistenState;
+  hotState: Handsontable.plugins.PersistentState;
   hotFilters: Handsontable.plugins.Filters;
   loadingBar: HTMLElement;
 
   // this.contentEl is not exposed, so cheat a bit.
   public get extContentEl(): HTMLElement {
-    // @ts-ignore
     return this.contentEl;
   }
 
@@ -134,7 +193,6 @@ class CsvView extends TextFileView {
     this.hotExport = this.hot.getPlugin('exportFile');
     this.hotState = this.hot.getPlugin('persistentState');
     this.hotFilters = this.hot.getPlugin('filters');
-
   }
 
   hotChange = (changes: Handsontable.CellChange[], source: Handsontable.ChangeSource) => {
@@ -189,9 +247,7 @@ class CsvView extends TextFileView {
       data.unshift(this.hot.getColHeader());
     }
 
-    let csvString = Papa.unparse(data);
-
-    return csvString;
+    return Papa.unparse(data);
     // return Papa.unparse({fields: this.parseResult.fields, data: this.parseResult.data}, {header: false});
     // return Papa.unparse(this.parseResult);
   }
@@ -212,7 +268,9 @@ class CsvView extends TextFileView {
       if (data.charCodeAt(0) === 0xFEFF) data = data.slice(1);
 
       // parse the incoming data string
+      // @ts-ignore My IDE won't recognise the parse string...
       Papa.parse(data, {
+        download: undefined,
         header: false,
         complete: results => {
           this.parseResult = results;
@@ -281,25 +339,23 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
       this.eGui = this.hot.rootDocument.createElement('DIV');
       Handsontable.dom.addClass(this.eGui, 'htMarkdownEditor');
       Handsontable.dom.addClass(this.eGui, 'csv-cell-edit');
-      
+
       // create a markdown (editor) view
       this.view = new MarkdownView(extContext.leaf);
-      this.view.currentMode = this.view.sourceMode;
 
-      // @ts-ignore add the editor element to the container
-      this.eGui.appendChild(this.view.sourceMode.editorEl);
+      this.eGui.appendChild(this.view.contentEl);
       // hide the container
       this.eGui.style.display = 'none';
       // add the container to the table root element
       this.hot.rootElement.appendChild(this.eGui);
     }
   }
-  
+
   open(event?: Event): void {
     this.refreshDimensions();
     this.eGui.show();
-    this.view.sourceMode.cmEditor.focus();
-    this.view.sourceMode.cmEditor.refresh();
+    this.view.editor.focus();
+    this.view.editor.refresh();
   }
 
   refreshDimensions() {
@@ -362,11 +418,9 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
     }
 
     const cellComputedStyle = Handsontable.dom.getComputedStyle(this.TD, this.hot.rootWindow);
-    //@ts-ignore
     if (parseInt(cellComputedStyle.borderTopWidth, 10) > 0) {
       height -= 1;
     }
-    //@ts-ignore
     if (parseInt(cellComputedStyle.borderLeftWidth, 10) > 0) {
       width -= 1;
     }
@@ -421,13 +475,13 @@ class MarkdownCellEditor extends Handsontable.editors.BaseEditor {
     this.eGui.hide();
   }
   focus(): void {
-    this.view.sourceMode.cmEditor.focus();
-    this.view.sourceMode.cmEditor.refresh();
+    this.view.editor.focus();
+    this.view.editor.refresh();
   }
   getValue() {
-    return this.view.sourceMode.get();
+    return this.view.currentMode.get();
   }
   setValue(newValue?: any): void {
-    this.view.sourceMode.set(newValue, true);
+    this.view.currentMode.set(newValue, true);
   }
 }

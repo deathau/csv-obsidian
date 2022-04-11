@@ -2,7 +2,7 @@
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/deathau/csv-obsidian?style=for-the-badge&sort=semver)](https://github.com/csv-obsidian/releases/latest)
 ![GitHub All Releases](https://img.shields.io/github/downloads/deathau/csv-obsidian/total?style=for-the-badge)
 
-A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of CSV files in a spreadsheet-like table format.  
+A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of CSV files in a spreadsheet-like table format.
 
 **Back up your CSV files!** This plugin is very new and therefore experimental. At this stage, data loss is a very real possibility!
 
@@ -23,11 +23,11 @@ A plugin for [Obsidian](https://obsidian.md) which allows viewing and editing of
 ### From GitHub
 - Download the latest master
 - Extract the files from the zip to your vault's plugins folder: `<vault>/.obsidian/plugins/ini-obsidian`  
-Note: On some machines the `.obsidian` folder may be hidden. On MacOS you should be able to press `Command+Shift+Dot` to show the folder in Finder.
+  Note: On some machines the `.obsidian` folder may be hidden. On MacOS you should be able to press `Command+Shift+Dot` to show the folder in Finder.
 - Reload Obsidian
 - If prompted about Safe Mode, you can disable safe mode and enable the plugin.
-Otherwise head to Settings, third-party plugins, make sure safe mode is off and
-enable the plugin from there.
+  Otherwise head to Settings, third-party plugins, make sure safe mode is off and
+  enable the plugin from there.
 
 ## Development
 
@@ -42,7 +42,7 @@ tweaks, you can do the following:
 - `npm i` or `yarn` to install dependencies
 - `npm run build` to compile.
 - Copy `manifest.json`, `main.js` and `styles.css` to a subfolder of your plugins
-folder (e.g, `<vault>/.obsidian/plugins/<plugin-name>/`)
+  folder (e.g, `<vault>/.obsidian/plugins/<plugin-name>/`)
 - Reload obsidian to see changes
 
 Alternately, you can clone the repo directly into your plugins folder and once
@@ -59,3 +59,5 @@ much, feel free to throw some coins in my hat via
 # Version History
 ## 0.0.1
 Initial release of csv-obsidian! See [Features](#Features) above
+## 0.0.2
+Update of the source code and the package.json to use the latest version the api and each package.
